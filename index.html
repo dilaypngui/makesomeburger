@@ -1083,8 +1083,8 @@
 
   function metalMat(){
     return new THREE.MeshStandardMaterial({
-      color: 0x8F979E, metalness: 1.0, roughness: 0.26,
-      roughnessMap: brushed, envMapIntensity: 1.40
+      color: 0x646C73, metalness: 1.0, roughness: 0.26,
+      roughnessMap: brushed, envMapIntensity: 1.12
     });
   }
   var boardMat = metalMat();
@@ -1221,7 +1221,7 @@
     traySlots = [];
     for (var t=0;t<TRAY;t++){
       var slot = new THREE.Mesh(slotGeo,
-        new THREE.MeshStandardMaterial({ color:0x7C868D, metalness:0.7, roughness:0.42, transparent:true, opacity:0.60 }));
+        new THREE.MeshStandardMaterial({ color:0x565E64, metalness:0.7, roughness:0.42, transparent:true, opacity:0.60 }));
       slot.scale.set(CUBE + 0.24, 0.1, CUBE + 0.24);
       slot.position.set(trayX(t), 0.04, HAND_Z);
       slot.receiveShadow = true;
@@ -1232,7 +1232,7 @@
     colStrips = [];
     for (var c=0;c<COLS;c++){
       var strip = new THREE.Mesh(stripGeo,
-        new THREE.MeshStandardMaterial({ color:0x78838A, metalness:0.65, roughness:0.45, transparent:true, opacity:0.38 }));
+        new THREE.MeshStandardMaterial({ color:0x525A60, metalness:0.65, roughness:0.45, transparent:true, opacity:0.38 }));
       strip.position.set(colX(c), 0.03, 0);
       strip.receiveShadow = true;
       strip.userData.col = c;
@@ -1298,10 +1298,10 @@
   }
 
   var WOODS = {
-    mese:   { name:"Krom",   tint:0x8F979E, cost:0 },
-    ceviz:  { name:"Bakır",  tint:0x9E5C2E, cost:700 },
-    kiraz:  { name:"Altın",  tint:0xB8933E, cost:1500 },
-    kulrengi:{ name:"Füme",  tint:0x565C62, cost:2600 }
+    mese:   { name:"Krom",   tint:0x646C73, cost:0 },
+    ceviz:  { name:"Bakır",  tint:0x7A4520, cost:700 },
+    kiraz:  { name:"Altın",  tint:0x8F7028, cost:1500 },
+    kulrengi:{ name:"Füme",  tint:0x3C4146, cost:2600 }
   };
   var DECOR = [
     { key:"plant",  name:"Saksı",          cost:900 },
@@ -1728,12 +1728,12 @@
       for (var i=0;i<COLS;i++){
         var mm = colStrips[i].material;
         if (dragging && i === hoverCol){
-          mm.color.copy(foodColor((dragSlot >= 0 && tray[dragSlot]) ? ING[tray[dragSlot].color].hex : 0x78838A));
+          mm.color.copy(foodColor((dragSlot >= 0 && tray[dragSlot]) ? ING[tray[dragSlot].color].hex : 0x525A60));
           mm.opacity = 0.95; colStrips[i].position.y = 0.08;
         } else if (nearOrder(i)){
           mm.color.setHex(0x62B87A); mm.opacity = 0.58; colStrips[i].position.y = 0.03;
         } else {
-          mm.color.setHex(0x78838A); mm.opacity = 0.34; colStrips[i].position.y = 0.03;
+          mm.color.setHex(0x525A60); mm.opacity = 0.36; colStrips[i].position.y = 0.03;
         }
       }
       return;
@@ -1750,7 +1750,7 @@
         m.color.copy(foodColor(ING[top].hex));
         m.opacity = (c === hoverCol && dragging) ? 0.95 : 0.62;
       } else {
-        m.color.setHex(0x78838A); m.opacity = 0.34;
+        m.color.setHex(0x525A60); m.opacity = 0.36;
       }
       colStrips[c].position.y = (legal && c === hoverCol && dragging) ? 0.08 : 0.03;
     }
@@ -2445,12 +2445,31 @@
     }
 
     if (!busy){
+      // tepsideki malzemeler
       for (var s=0;s<tray.length;s++){
         var t = tray[s];
         if (!t || isAnimating(t.mesh)) continue;
         if (dragging && s === dragSlot) continue;
+        var bt = t.mesh.userData;
+        if (bt.baseRot === undefined) bt.baseRot = t.mesh.rotation.y;
         t.mesh.position.y = Y_BASE + Math.sin(now * 0.0026 + s*1.1) * 0.05;
-        t.mesh.rotation.y = Math.sin(now * 0.0012 + s) * 0.08;
+        t.mesh.rotation.y = bt.baseRot + Math.sin(now * 0.0012 + s) * 0.08;
+      }
+      // tahtadaki oynanabilir slotlar da hafifçe salınsın (ekmekler sabit)
+      var r0 = (mode === "service") ? FILL_FROM : 0;
+      var r1 = (mode === "service") ? FILL_TO : ROWS - 1;
+      for (var c2=0;c2<cols.length;c2++){
+        var colArr = cols[c2];
+        if (!colArr) continue;
+        for (var r2=r0; r2<=r1; r2++){
+          var cell = colArr[r2];
+          if (!cell || isAnimating(cell.mesh)) continue;
+          var bd = cell.mesh.userData;
+          if (bd.baseRot === undefined) bd.baseRot = cell.mesh.rotation.y;
+          if (bd.phase === undefined) bd.phase = c2*0.9 + r2*1.7;
+          cell.mesh.position.y = Y_BASE + Math.sin(now * 0.0021 + bd.phase) * 0.032;
+          cell.mesh.rotation.y = bd.baseRot + Math.sin(now * 0.0009 + bd.phase*0.6) * 0.055;
+        }
       }
     }
     renderer.render(scene, camera);
