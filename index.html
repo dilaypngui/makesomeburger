@@ -202,6 +202,43 @@
   .goalBar{height:8px;border-radius:99px;background:rgba(62,44,30,.14);overflow:hidden;}
   .goalBar span{display:block;height:100%;border-radius:99px;background:var(--accent);}
 
+  /* ---- eğitim ---- */
+  #tutSpot{
+    position:fixed;left:0;top:0;width:0;height:0;border-radius:20px;z-index:30;
+    box-shadow:0 0 0 9999px rgba(38,24,12,.70);
+    pointer-events:none;opacity:0;
+    transition:left .38s ease, top .38s ease, width .38s ease, height .38s ease, opacity .3s ease;
+  }
+  #tutSpot.on{opacity:1;}
+  #tutSpot.full{box-shadow:0 0 0 9999px rgba(38,24,12,.70);}
+  #tutHand{
+    position:fixed;left:0;top:0;width:38px;height:38px;z-index:33;pointer-events:none;
+    display:none;transition:transform 1s cubic-bezier(.4,0,.2,1), opacity .4s ease;
+  }
+  #tutHand::before{
+    content:"";position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #FFFFFF, #FFE0B0 60%, #E8A24A);
+    box-shadow:0 4px 14px rgba(40,22,8,.5), 0 0 0 6px rgba(255,220,170,.28);
+  }
+  #tutCard{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:34;
+    width:min(560px, calc(100vw - 32px));
+    background:var(--flour);border-radius:20px;padding:18px 20px 16px;
+    box-shadow:0 18px 44px rgba(40,24,12,.45);border:1px solid rgba(62,44,30,.12);
+    display:none;
+  }
+  #tutCard.on{display:block;animation:tutIn .3s ease both;}
+  @keyframes tutIn{from{opacity:0;transform:translateX(-50%) translateY(14px);}
+                   to{opacity:1;transform:translateX(-50%) translateY(0);}}
+  #tutCard p{font-size:.94rem;font-weight:700;line-height:1.5;color:var(--ink);margin-bottom:14px;}
+  #tutCard .tutRow{display:flex;gap:10px;justify-content:space-between;align-items:center;}
+  #tutStepDots{display:flex;gap:5px;}
+  #tutStepDots i{width:6px;height:6px;border-radius:50%;background:rgba(62,44,30,.22);display:block;}
+  #tutStepDots i.on{background:var(--accent);}
+  #tutCard .tutBtns{display:flex;gap:8px;}
+  #tutCard button{padding:9px 18px;font-size:.82rem;}
+  .tutWaiting #tutNext{display:none;}
+
   @media (max-width:680px){
     .brand h1{font-size:1rem;}
     .brand span{display:none;}
@@ -217,6 +254,8 @@
     .tprice{font-size:.68rem;}
     #hint{bottom:62px;font-size:.72rem;}
     #toast{font-size:1.5rem;}
+    #tutCard{bottom:16px;padding:14px 16px 13px;}
+    #tutCard p{font-size:.85rem;}
   }
   @media (prefers-reduced-motion:reduce){
     button,.mode,.ticket{transition:none;}
@@ -239,6 +278,18 @@
 
 <div id="tickets"></div>
 <div id="toast"></div>
+<div id="tutSpot"></div>
+<div id="tutHand"></div>
+<div id="tutCard">
+  <p id="tutText"></p>
+  <div class="tutRow">
+    <div id="tutStepDots"></div>
+    <div class="tutBtns">
+      <button id="tutSkip">Atla</button>
+      <button id="tutNext" class="primary">İleri</button>
+    </div>
+  </div>
+</div>
 <div id="hint">Malzemeyi ekmeklerin arasındaki dört slota sürükle</div>
 
 <div class="bar" id="botbar">
@@ -262,6 +313,9 @@
         <strong>Hazırlık</strong>
         <span>Malzemeyi ancak tepesi aynı olan hizaya koyabilirsin. Altı hizayı da tek malzemeye indir. Geri alma serbest.</span>
       </div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:12px;">
+      <button id="howto">Nasıl oynanır</button>
     </div>
     <div class="best" id="bestLine"></div>
   </div>
@@ -1257,6 +1311,8 @@
 
   // ---------- durum ----------
   var mode = "service";
+  var tut = { active:false, step:0, waitingMove:false, awaitServe:false,
+              allowCol:null, allowIng:null, handTimer:0 };
   var cols = [], tray = [], history = [];
   var moves = 0, busy = false, startState = null;
   var money = 0, day = 1, servedToday = 0, dayTarget = 12, servedTotal = 0, streak = 0;
@@ -1659,6 +1715,14 @@
   }
   function streakMult(){ return Math.min(1 + 0.08 * Math.max(0, streak - 1), 1.8); }
   function updateHUD(){
+    if (tut.active){
+      document.getElementById("stats").innerHTML = "";
+      document.getElementById("botbar").style.display = "none";
+      document.getElementById("modeLabel").textContent = "Eğitim";
+      updateStrips();
+      return;
+    }
+    document.getElementById("botbar").style.display = "";
     var html = "";
     if (mode === "prep"){
       html += statPill("Hamle", moves, false);
@@ -1727,6 +1791,14 @@
     if (mode === "service"){
       for (var i=0;i<COLS;i++){
         var mm = colStrips[i].material;
+        if (tut.active && tut.allowCol === i){
+          mm.color.setHex(0xE8A33C); mm.opacity = 0.92; colStrips[i].position.y = 0.08;
+          continue;
+        }
+        if (tut.active){
+          mm.color.setHex(0x525A60); mm.opacity = 0.30; colStrips[i].position.y = 0.03;
+          continue;
+        }
         if (dragging && i === hoverCol){
           mm.color.copy(foodColor((dragSlot >= 0 && tray[dragSlot]) ? ING[tray[dragSlot].color].hex : 0x525A60));
           mm.opacity = 0.95; colStrips[i].position.y = 0.08;
@@ -1862,9 +1934,10 @@
 
   function afterMoveService(c){
     if (tryServe()) return;
-    if (checkSupply()) return;
+    if (!tut.active && checkSupply()) return;
     busy = false;
     renderTickets(); updateHUD();
+    tutOnMoveDone();
   }
 
   // hiçbir sipariş mevcut malzemelerle tamamlanamıyorsa tepsiye sevkiyat gelir
@@ -1923,9 +1996,11 @@
     var tip = o.expired ? 0 : tipOf(o);
     streak = o.expired ? 0 : streak + 1;
     var gross = Math.round((o.price + tip) * streakMult() * (1 + branchBonus()));
-    money += gross; dayGross += gross;
-    servedToday++; servedTotal++;
-    if (money > best.money){ best.money = money; saveBest(); }
+    if (!tut.active){
+      money += gross; dayGross += gross;
+      servedToday++; servedTotal++;
+      if (money > best.money){ best.money = money; saveBest(); }
+    }
 
     chime(o.vip ? 990 : 880, o.vip ? 5 : 4);
     toast((o.vip ? "VIP · " : "") + o.name + "  +₺" + gross);
@@ -1991,6 +2066,12 @@
           pending--;
           beep(520 + r*40, 0.07, 0.04);
           if (pending === 0){
+            if (tut.active){
+              busy = false;
+              renderTickets(); updateHUD();
+              tutOnServeDone();
+              return;
+            }
             if (servedToday >= dayTarget){ endDay(); return; }
             if (tryServe()) return;
             if (checkSupply()) return;
@@ -2346,6 +2427,10 @@
     setNdc(e.clientX, e.clientY);
     var s = pickTraySlot();
     if (s < 0) return;
+    if (tut.active){
+      if (!tut.waitingMove) return;
+      if (tut.allowIng != null && tray[s] && tray[s].color !== tut.allowIng) return;
+    }
     dragging = true; dragSlot = s; hoverCol = -1;
     hideHint();
     if (renderer.domElement.setPointerCapture){
@@ -2379,7 +2464,8 @@
     renderer.domElement.style.cursor = "default";
     var allowed = (c >= 0) && !!cols[c] && !!tray[s] &&
       (mode === "service" || tray[s].color === cols[c][0].color);
-    if (allowed) play(c, s, true);
+    if (allowed && tut.active && tut.allowCol != null && c !== tut.allowCol) allowed = false;
+    if (allowed){ if (tut.active) tutStopHand(); play(c, s, true); }
     else {
       if (c >= 0) beep(170, 0.09, 0.05);
       if (tray[s]) tween(tray[s].mesh, new THREE.Vector3(trayX(s), Y_BASE, HAND_Z), 0.26, 0, 0.25, null);
@@ -2418,7 +2504,7 @@
     camera.lookAt(0, 0, centerZ);
     camera.updateProjectionMatrix();
   }
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", function(){ resize(); tutRefresh(); });
   resize();
 
   // ---------- döngü ----------
@@ -2428,7 +2514,7 @@
     prev = now;
     stepAnims(dt);
 
-    if (mode === "service" && cols.length && !anyOverlay()){
+    if (mode === "service" && !tut.active && cols.length && !anyOverlay()){
       var changed = false;
       for (var i=0;i<orders.length;i++){
         var o = orders[i];
@@ -2477,6 +2563,216 @@
   }
   requestAnimationFrame(loop);
 
+  // ================= ETKİLEŞİMLİ EĞİTİM =================
+  var TUT_KEY = "pastelTezgahEgitim1";
+  function tutSeen(){ try { return localStorage.getItem(TUT_KEY) === "1"; } catch(e){ return false; } }
+  function tutMarkSeen(){ try { localStorage.setItem(TUT_KEY, "1"); } catch(e){} }
+
+  var TUT_BOARD = {
+    cols: [
+      [EKMEK, PEYNIR, MARUL,  DOMATES, TURSU,   EKMEK_ALT],
+      [EKMEK, TURSU,  DOMATES, TURSU,  PEYNIR,  EKMEK_ALT],
+      [EKMEK, MARUL,  DOMATES, TURSU,  DOMATES, EKMEK_ALT]
+    ],
+    tray: [KOFTE, KOFTE, MARUL]
+  };
+
+  var TUT_STEPS = [
+    { text:"Bir fast food tezgâhındasın. Müşteriler sipariş verecek, sen hazırlayacaksın. Önce tezgâhı tanıyalım.",
+      focus:null, wait:"tap" },
+    { text:"Her hizanın iki ucundaki ekmekler sabittir — biri üst kapak, biri alt kapak. Onlara dokunamazsın, hiç hareket etmezler.",
+      focus:"buns", wait:"tap" },
+    { text:"Aradaki dört slot senin. Burger burada hazırlanır.",
+      focus:"slots", wait:"tap" },
+    { text:"Müşterinin siparişi fişte yazıyor: iki köfte, bir peynir, bir marul. Sıra önemli değil — dört slotta bu dördü bulunsun yeter.",
+      focus:"ticket", wait:"tap" },
+    { text:"Tepsiden bir köfte al ve soldaki hizaya sürükle.",
+      focus:null, wait:"move", col:0, ing:KOFTE, hand:true },
+    { text:"İşin püf noktası bu: köfte üstten girdi, hiza bir aşağı kaydı ve en alttaki turşu tepsine döndü. Her koyduğunda eline bir malzeme geri gelir.",
+      focus:"lane", wait:"tap" },
+    { text:"Bir köfte daha koy — sipariş tamamlanacak.",
+      focus:null, wait:"move", col:0, ing:KOFTE, hand:true },
+    { text:"Burger birleşti ve fişe uçtu. Hiza boşaldı, yerine yeni malzemeler geldi. Kazandığın para kasaya yazıldı.",
+      focus:null, wait:"tap" },
+    { text:"Hepsi bu. Müşterilerin sabrı azaldıkça bahşiş düşer, o yüzden acele et. Kazandığın parayla yeni hiza ve tepsi gözü alabilirsin. Kolay gelsin!",
+      focus:null, wait:"tap", last:true }
+  ];
+
+  function tutProjectRect(pts, pad){
+    var v = new THREE.Vector3();
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (var i=0;i<pts.length;i++){
+      v.set(pts[i][0], pts[i][1], pts[i][2]).project(camera);
+      var sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+      var sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+      if (sx < minX) minX = sx;
+      if (sx > maxX) maxX = sx;
+      if (sy < minY) minY = sy;
+      if (sy > maxY) maxY = sy;
+    }
+    pad = (pad == null) ? 14 : pad;
+    return { left:minX - pad, top:minY - pad, width:(maxX - minX) + pad*2, height:(maxY - minY) + pad*2 };
+  }
+  function tutTilePts(cList, rList){
+    var pts = [];
+    for (var i=0;i<cList.length;i++)
+      for (var j=0;j<rList.length;j++){
+        var x = colX(cList[i]), z = rowZ(rList[j]);
+        pts.push([x-0.5, Y_BASE, z-0.5], [x+0.5, Y_BASE+0.35, z+0.5]);
+      }
+    return pts;
+  }
+  function tutFocusRect(kind){
+    var all = [], i;
+    if (kind === "buns"){
+      for (i=0;i<COLS;i++) all.push(i);
+      return tutProjectRect(tutTilePts(all, [0, ROWS-1]), 16);
+    }
+    if (kind === "slots"){
+      for (i=0;i<COLS;i++) all.push(i);
+      return tutProjectRect(tutTilePts(all, [FILL_FROM, FILL_TO]), 14);
+    }
+    if (kind === "lane"){
+      return tutProjectRect(tutTilePts([0], [FILL_FROM, FILL_TO]), 16);
+    }
+    if (kind === "tray"){
+      var pts = [];
+      for (i=0;i<TRAY;i++) pts.push([trayX(i)-0.55, Y_BASE, HAND_Z-0.55], [trayX(i)+0.55, Y_BASE+0.35, HAND_Z+0.55]);
+      return tutProjectRect(pts, 14);
+    }
+    if (kind === "ticket"){
+      var el = document.querySelector("#tickets .ticket");
+      if (!el) return null;
+      var r = el.getBoundingClientRect();
+      return { left:r.left - 10, top:r.top - 10, width:r.width + 20, height:r.height + 20 };
+    }
+    return null;
+  }
+  function tutSetSpot(rect){
+    var el = document.getElementById("tutSpot");
+    if (!rect){ el.classList.remove("on"); return; }
+    el.style.left = rect.left + "px";
+    el.style.top = rect.top + "px";
+    el.style.width = rect.width + "px";
+    el.style.height = rect.height + "px";
+    el.classList.add("on");
+  }
+  function tutStopHand(){
+    clearInterval(tut.handTimer);
+    tut.handTimer = 0;
+    document.getElementById("tutHand").style.display = "none";
+  }
+  function tutStartHand(){
+    var a = tutFocusRect("tray"), b = tutFocusRect("lane");
+    if (!a || !b) return;
+    var h = document.getElementById("tutHand");
+    h.style.display = "block";
+    var p0 = { x:a.left + a.width/2, y:a.top + a.height/2 };
+    var p1 = { x:b.left + b.width/2, y:b.top + b.height/2 };
+    var on = false;
+    clearInterval(tut.handTimer);
+    function tick(){
+      on = !on;
+      var p = on ? p1 : p0;
+      h.style.transform = "translate(" + (p.x - 19) + "px," + (p.y - 19) + "px)";
+      h.style.opacity = on ? "0.35" : "0.95";
+    }
+    tick();
+    tut.handTimer = setInterval(tick, 1150);
+  }
+  function tutDots(){
+    var d = "";
+    for (var i=0;i<TUT_STEPS.length;i++) d += '<i class="' + (i === tut.step ? "on" : "") + '"></i>';
+    document.getElementById("tutStepDots").innerHTML = d;
+  }
+  function tutShow(n){
+    if (n >= TUT_STEPS.length){ tutFinish(); return; }
+    tut.step = n;
+    var st = TUT_STEPS[n];
+    document.getElementById("tutText").textContent = st.text;
+    document.getElementById("tutCard").classList.add("on");
+    document.body.classList.toggle("tutWaiting", st.wait === "move");
+    tutDots();
+    tutSetSpot(st.focus ? tutFocusRect(st.focus) : null);
+    if (st.wait === "move"){
+      tut.waitingMove = true;
+      tut.allowCol = st.col;
+      tut.allowIng = st.ing;
+      if (st.hand) tutStartHand(); else tutStopHand();
+    } else {
+      tut.waitingMove = false;
+      tut.allowCol = null;
+      tut.allowIng = null;
+      tutStopHand();
+    }
+    updateStrips();
+  }
+  function tutRefresh(){
+    if (!tut.active) return;
+    var st = TUT_STEPS[tut.step];
+    if (!st) return;
+    tutSetSpot(st.focus ? tutFocusRect(st.focus) : null);
+    if (st.wait === "move" && st.hand) tutStartHand();
+  }
+
+  function startTutorial(){
+    mode = "service";
+    tut.active = true; tut.step = 0;
+    tut.waitingMove = false; tut.awaitServe = false;
+    tut.allowCol = null; tut.allowIng = null;
+
+    COLS = 3; TRAY = 3; NUM_ORDERS = 1;
+    day = 1; servedToday = 0; streak = 0; dayGross = 0;
+    maxPatience = 90;
+    relayout(); applyDecor();
+    activePool = [KOFTE, PEYNIR, MARUL, DOMATES, TURSU];
+
+    var ings = [KOFTE, KOFTE, PEYNIR, MARUL];
+    orders = [{
+      ings: ings, key: ings.slice().sort().join(","),
+      name: "Klasik Burger", vip: false, price: 75,
+      patience: maxPatience, maxP: maxPatience, expired: false, id: ++orderSeq
+    }];
+    buildBoard({ cols: TUT_BOARD.cols.map(function(a){ return a.slice(); }), tray: TUT_BOARD.tray.slice() });
+
+    hideOverlays();
+    document.getElementById("hint").style.opacity = "0";
+    renderTickets(); updateHUD();
+    tutShow(0);
+  }
+
+  function tutFinish(){
+    tut.active = false;
+    tut.waitingMove = false; tut.allowCol = null; tut.allowIng = null;
+    tutStopHand();
+    tutSetSpot(null);
+    document.getElementById("tutCard").classList.remove("on");
+    document.body.classList.remove("tutWaiting");
+    tutMarkSeen();
+    chooseMode("service");
+  }
+
+  function tutOnMoveDone(){
+    if (!tut.active || !tut.waitingMove) return;
+    tut.waitingMove = false;
+    tut.allowCol = null; tut.allowIng = null;
+    tutStopHand();
+    setTimeout(function(){ tutShow(tut.step + 1); }, 260);
+  }
+  function tutOnServeDone(){
+    if (!tut.active) return;
+    tut.waitingMove = false;
+    tut.allowCol = null; tut.allowIng = null;
+    tutStopHand();
+    setTimeout(function(){ tutShow(tut.step + 1); }, 420);
+  }
+
+  document.getElementById("tutNext").addEventListener("click", function(){
+    if (TUT_STEPS[tut.step] && TUT_STEPS[tut.step].last) tutFinish();
+    else tutShow(tut.step + 1);
+  });
+  document.getElementById("tutSkip").addEventListener("click", tutFinish);
+
   // ---------- menü / düğmeler ----------
   function bestLine(){
     var parts = [];
@@ -2486,6 +2782,7 @@
   }
   function openMenu(){ hideOverlays(); bestLine(); document.getElementById("menu").classList.add("show"); }
   function chooseMode(m){
+    if (m === "service" && !tut.active && !tutSeen()){ hideOverlays(); startTutorial(); return; }
     mode = m;
     hideOverlays();
     newRun();
@@ -2502,6 +2799,9 @@
   document.getElementById("pickPrep").addEventListener("click", function(){ chooseMode("prep"); });
   document.getElementById("pickService").addEventListener("keydown", function(e){ if (e.key==="Enter"||e.key===" ") chooseMode("service"); });
   document.getElementById("pickPrep").addEventListener("keydown", function(e){ if (e.key==="Enter"||e.key===" ") chooseMode("prep"); });
+  document.getElementById("howto").addEventListener("click", function(){
+    hideOverlays(); startTutorial();
+  });
   document.getElementById("undo").addEventListener("click", undo);
   document.getElementById("newgame").addEventListener("click", function(){
     if (mode === "service"){
